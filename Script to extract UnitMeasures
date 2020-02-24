@@ -1,0 +1,296 @@
+import pandas as pd
+import re 
+
+def get_unit(string):
+    string = string.strip()
+    if  ' ' in string or re.findall(r'[A-Z]+\.?([0-9]+)',string):
+        try:
+            string_stripped = re.search('([0-9]*\.?[0-9]+)\s?[A-Z]+', string).group()
+        except:
+            string_stripped = string
+        string_stripped = re.sub(r'[A-Z]+', '', string_stripped).strip()
+    else:
+        string_stripped = re.sub(r'[A-Z]+', '', string).strip()
+    return string_stripped
+
+def get_digits(string):
+    string_stripped = re.sub(r'-', '', string)
+    string_stripped = re.sub(r'^\.', '', string_stripped)
+    string_stripped = re.sub(r'X', '*', string_stripped)
+    string_stripped = re.sub(r',', '.', string_stripped)
+    string_stripped = re.sub(r'\(', '', string_stripped)
+    string_stripped = re.sub(r'\.$', '', string_stripped)
+    
+    
+    if '*' in string_stripped and '+' in string_stripped:
+        calc = 1
+        string_stripped = string_stripped.split('*')
+        for n in string_stripped:
+            if '+' in  n:
+                calc_plus = 0
+                n_split = n.split('+')
+                for i in n_split:
+                    i = get_unit(i)
+                    if i:
+                        calc_plus += float(i)
+                    
+                calc = calc * calc_plus
+            else:
+                n = get_unit(n)
+                if n:
+                    calc =  calc * float(n)
+    
+    
+    elif '*' in string_stripped:
+        calc = 1
+        string_stripped = string_stripped.split('*')
+        for n in string_stripped:
+            n = get_unit(n)
+            if n:
+                calc =  calc * float(n)
+    
+    elif '+' in string_stripped:
+        calc = 0 
+        string_stripped = string_stripped.split('+')
+        for n in string_stripped:
+            n = get_unit(n)
+            if n:
+                calc += float(n)
+    else:
+        calc = get_unit(string_stripped)
+        if calc:
+            calc = float(calc)
+    return calc
+
+def extract_unitmeasure(row):
+    inputdata = row['Art MGB description'].upper()
+    #handling stuks/piceces
+    st = re.findall(r'([0-9]*X?\+?[0-9]+\s?ST[A-Z]*)', inputdata)
+    pc = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\-?[0-9]*\.?\,?[0-9]+\s?\-?PIECES?)', inputdata)
+    pack = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\-?[0-9]*\.?\,?[0-9]+\s?\-?PACKS?)', inputdata)
+    per = re.findall(r'(PER\s?[0-9]*\.?\,?[0-9]+)', inputdata)
+    
+    if st:
+        unitpiece = st[0].strip()
+        unitpiece = re.sub(r'UKS?', '', unitpiece)
+        if re.findall(r'^\+', unitpiece) or re.findall(r'ST([A-Z]+)',  unitpiece):
+            unitpiece = None
+            unitp = None
+            piece = None
+        else:
+            unitp = get_digits(unitpiece)
+            piece = 'Stuk'
+    elif pc:
+        unitpiece = pc[0].strip()
+        unitp = get_digits(unitpiece)
+        piece = 'Piece'
+    elif per:
+        unitpiece = per[0].strip()
+        unitp = get_digits(unitpiece)
+        piece = 'Per'
+    elif pack:
+        unitpiece = pack[0].strip()
+        unitp = get_digits(unitpiece)
+        piece = 'Pack'
+    else:
+        unitpiece = None
+        unitp = None
+        piece = None
+    
+    #handling Unitmeasures
+    lt = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?L[A-Z]*\.?\s?(X\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    kg = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?K[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    gr = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?G[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    ml = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?ML[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    mm = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?MM[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    m = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?M[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    cc = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?CC[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    cl = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?CL[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    cm = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?CM[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    pl = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?PL[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    pm = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?PM[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    pk = re.findall(r'([0-9]*\.?\,?[0-9]*\'?X?\+?\(?[0-9]*\.?\,?[0-9]*\'?X?\+?[0-9]*\.?\,?[0-9]+\s?\-?PK[A-Z]*\.?\s?(X?\s?[0-9]*\.?\,?[0-9]*\s?S?T?)*)', inputdata)
+    
+    unitmeasure = None
+    measure_o = None
+    unitm_o = None
+    measure = None
+    unitm = None
+    
+    if lt:
+        estimate, x_multi = lt[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate)
+        estimate = estimate.replace('T', '').replace('ITER', '').replace('ITRE','').strip()
+        if len(re.findall(r'L([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'L'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Litre'
+            unitm = unitm_o
+        else:
+            lt = []
+    elif kg:
+        estimate, x_multi = kg[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate)
+        estimate = estimate.replace('G', '').replace('ILO', '').strip()
+        if len(re.findall(r'K([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'KG'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Kilo'
+            unitm = unitm_o
+        else:
+            kg = []
+    elif gr:
+        estimate, x_multi = gr[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate)
+        if 'GRS' not in estimate:
+            estimate = re.sub(r'RA?M?S?', '', estimate).strip()
+            if len(re.findall(r'G([A-W,Y,Z]+)',  estimate)) == 0:
+                unitmeasure = estimate
+                measure_o = 'G'
+                unitm_o = get_digits(unitmeasure)
+                measure = 'Kilo'
+                unitm = unitm_o / 1000
+            else: 
+                gr = []
+        else:
+            gr = []
+    elif ml:
+        estimate, x_multi = ml[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'ML([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'ML'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Litre'
+            unitm = unitm_o / 1000  
+        else: 
+            ml = []
+    elif mm:
+        estimate, x_multi = mm[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'MM([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'MM'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Metre'
+            unitm = unitm_o / 1000
+        else:
+            mm = []
+    elif cc:
+        estimate, x_multi = cc[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'CC([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'CC'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Litre'
+            unitm = unitm_o / 100
+        else:
+            cc = []
+    elif cl:
+        estimate, x_multi = cl[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'CL([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'CL'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Litre'
+            unitm = unitm_o / 100
+        else:
+            cl = []
+    elif cm:
+        estimate, x_multi = cm[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'CM([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'CM'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Metre'
+            unitm = unitm_o / 100
+        else:
+            cm = []
+    elif m:
+        estimate, x_multi = m[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'M([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'M'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Metre'
+            unitm = unitm_o    
+        else: 
+            m = []
+    elif pl:
+        estimate, x_multi = pl[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'PL([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'PL'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Litre'
+            unitm = unitm_o
+        else: 
+            pl = []
+    elif pm:
+        estimate, x_multi = pm[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'PM([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'PM'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Metre'
+            unitm = unitm_o
+        else:
+            pm = []
+    elif pk:
+        estimate, x_multi = pk[0]
+        estimate = re.sub(r'\s?[0-9]*\.?\,?[0-9]+\s?ST?', '', estimate).strip()
+        if len(re.findall(r'PK([A-W,Y,Z]+)',  estimate)) == 0:
+            unitmeasure = estimate
+            measure_o = 'PK'
+            unitm_o = get_digits(unitmeasure)
+            measure = 'Kilo'
+            unitm = unitm_o
+        else:
+            pk = []
+    
+    if unitm :
+        if unitm > 10000:
+            measure_o = None
+            unitm_o = None
+            measure = None
+            unitm = None
+
+    if unitmeasure:
+        if len(re.findall('X', unitmeasure)) > 1 :
+            doublex = 1
+            measure_o
+            unitm_o
+            measure = None
+            unitm = None
+        else:
+            doublex = 0
+    else:
+        doublex = None
+        
+    #calculate number of unitmeasures found in description
+    if ml or mm:
+        m_len = 0
+    else:
+        m_len = len(m)
+    measure_numb = len(lt)+len(kg)+len(gr)+len(ml)+len(mm)+m_len+len(cc)+len(cl)+len(cm)+len(pl)+len(pm)+len(pk)
+    	
+    return unitmeasure, unitpiece, measure_numb, doublex, unitm_o, measure_o, unitm, measure, unitp, piece
+
+
+df = pd.read_excel(r'E:\odrive\Box\Makro NL\New_Project\Makro NL.xlsx')
+
+try:
+    extract_df  = df.apply(extract_unitmeasure, axis=1)
+    df[['Unitmeasure', 'Unitpiece', 'Measure_numb', 'DoubleX', 'UnitM_O', 'Measure_O', 'UnitM', 'Measure', 'UnitP', 'Piece']] = pd.DataFrame(extract_df.tolist(), index=df.index)
+except Exception as e:
+    print(e)
+	
+df.to_excel(r'E:\odrive\Box\Makro NL\New_Project\Makro_extract.xlsx', index=False)
